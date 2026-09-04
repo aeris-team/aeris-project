@@ -138,9 +138,10 @@ aerisproject/
 #### Clone and Install
 
 ```bash
-git clone https://github.com/eldrin-dotcom/AERIS.git
-cd aerisproject/ground-station/frontend
-npm run install:all
+git clone https://github.com/amblessly/aeris-project.git
+cd aeris-project
+cd ground-station/frontend
+npm install
 ```
 
 #### Run the Dashboard
@@ -184,8 +185,8 @@ sudo apt install -y screen
 sudo apt install -y chromium-browser
 
 # Clone project
-git clone https://github.com/eldrin-dotcom/AERIS.git
-cd AERIS/drone-onboard/raspberry-pi-5
+git clone https://github.com/amblessly/aeris-project.git
+cd aeris-project/drone-onboard/raspberry-pi-5
 
 # Create virtual environment
 python3 -m venv venv
