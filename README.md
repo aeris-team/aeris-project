@@ -2,13 +2,9 @@
 
 A complete drone-based search and rescue system with **decentralized, dual-link communication** and **localized Edge-AI detection** for post-disaster scenarios where conventional infrastructure is compromised.
 
----
-
 ## Abstract
 
 AERIS addresses the critical need for resilient communication and survivor detection in disaster-affected areas where public infrastructure is destroyed. By deploying an **off-grid dual-link architecture** — combining 5GHz Wi-Fi for high-bandwidth video streaming and 915/923MHz LoRa for reliable telemetry — the system maintains operational continuity during the "Golden Hour" when every second counts. **Edge-AI processing** on a Raspberry Pi 5 with **Hailo-8L NPU** reduces end-to-end latency from typical cloud-AI delays (150-200ms) to under 105ms, enabling rapid situational awareness and GPS coordinate dissemination to rescue personnel.
-
----
 
 ## Research Objectives
 
@@ -18,44 +14,6 @@ AERIS addresses the critical need for resilient communication and survivor detec
 4. Evaluate **detection accuracy, precision, recall, latency, and false positive rate** for survivor identification.
 5. Measure **power consumption and operational endurance** of the integrated system.
 6. Test effectiveness under **NLOS, obstructed environments, and environmental stress factors**.
-
----
-
-## Project Structure
-
-```
-aeris-project/
-│
-├── ground-station/              # Operator's Command Center (runs on laptop/PC)
-│   ├── frontend/                # React + TypeScript Dashboard
-│   │   ├── src/
-│   │   │   ├── components/     # UI components (LiveFeed, MissionMap, etc.)
-│   │   │   ├── pages/          # Page components (Dashboard, Map, Detections, Settings)
-│   │   │   ├── stores/         # Zustand state management
-│   │   │   ├── hooks/          # useWebSocket, useTelemetrySimulation
-│   │   │   ├── types/          # TypeScript types
-│   │   │   ├── App.tsx
-│   │   │   ├── main.tsx
-│   │   │   └── index.css
-│   │   ├── public/             # Static assets (AERIS logo)
-│   │   ├── package.json
-│   │   ├── tailwind.config.js
-│   │   ├── vite.config.ts
-│   │   └── README.md
-│   │
-│   └── backend/                 # FastAPI Backend (WebSocket server, port 8000)
-│       ├── main.py
-│       ├── requirements.txt
-│       └── README.md
-│
-├── drone-onboard/               # Code that runs on Raspberry Pi (mounted on drone)
-│   ├── raspberry-pi-4b/         # RPi 4B version (edge-AI)
-│   └── raspberry-pi-5/          # RPi 5 version (with Hailo-8L NPU)
-│
-└── README.md                    # This file
-```
-
----
 
 ## System Architecture
 
@@ -132,6 +90,43 @@ aeris-project/
 3. **Multi-Hop Resilient Routing** — Operates at 10 m/s flight speed over 8 km range with no single point of failure.
 4. **H.264 Hardware Encoding** — 200 Mbps raw stream compressed to 5-6 Mbps over UDP.
 5. **Age of Information (AoI) Optimization** — Decoupled critical navigation data from surveillance streams.
+
+---
+
+## Project Structure
+
+```
+aeris-project/
+│
+├── ground-station/              # Operator's Command Center (runs on laptop/PC)
+│   ├── frontend/                # React + TypeScript Dashboard
+│   │   ├── src/
+│   │   │   ├── components/     # UI components (LiveFeed, MissionMap, etc.)
+│   │   │   ├── pages/          # Page components (Dashboard, Map, Detections, Settings)
+│   │   │   ├── stores/         # Zustand state management
+│   │   │   ├── hooks/          # useWebSocket, useTelemetrySimulation
+│   │   │   ├── types/          # TypeScript types
+│   │   │   ├── App.tsx
+│   │   │   ├── main.tsx
+│   │   │   └── index.css
+│   │   ├── public/             # Static assets (AERIS logo)
+│   │   ├── package.json
+│   │   ├── tailwind.config.js
+│   │   ├── vite.config.ts
+│   │   ├── vercel.json
+│   │   └── README.md
+│   │
+│   └── backend/                 # FastAPI Backend (WebSocket server, port 8000)
+│       ├── main.py
+│       ├── requirements.txt
+│       └── README.md
+│
+├── drone-onboard/               # Code that runs on Raspberry Pi (mounted on drone)
+│   ├── raspberry-pi-4b/         # RPi 4B version (edge-AI)
+│   └── raspberry-pi-5/          # RPi 5 version (with Hailo-8L NPU)
+│
+└── README.md                    # This file
+```
 
 ---
 
@@ -299,17 +294,11 @@ IP: 192.168.1.50                 IP: 192.168.1.100
 
 **For network deployment:**
 
-Edit `ground-station/frontend/src/hooks/useWebSocket.ts`:
+Edit `ground-station/frontend/src/App.tsx`:
 
 ```typescript
 // Change to your GCS IP address
 useWebSocket('ws://192.168.1.50:8000/ws');
-```
-
-Or in `App.tsx`:
-
-```typescript
-useWebSocket('ws://YOUR_GCS_IP:8000/ws');
 ```
 
 ### Test Distances & Altitudes
@@ -358,23 +347,6 @@ Per paper: test at distances of **10, 50, 100, 150, 200 meters** and altitudes o
 | Backend (WebSocket) | [`ground-station/backend/README.md`](./ground-station/backend/README.md) |
 | RPi 4B (Detection) | [`drone-onboard/raspberry-pi-4b/README.md`](./drone-onboard/raspberry-pi-4b/README.md) |
 | RPi 5 (Detection + Hailo) | [`drone-onboard/raspberry-pi-5/README.md`](./drone-onboard/raspberry-pi-5/README.md) |
-
----
-
-## Folder Organization
-
-| Folder | Purpose | Runs On |
-|--------|---------|---------|
-| `ground-station/frontend/` | Web dashboard (React UI) | Laptop/PC |
-| `ground-station/backend/` | API server (FastAPI WebSocket) | Laptop/PC |
-| `drone-onboard/raspberry-pi-4b/` | Detection code (CPU only) | RPi 4B |
-| `drone-onboard/raspberry-pi-5/` | Detection code (with Hailo-8L NPU) | RPi 5 |
-
-**Why this structure?**
-- **Separation of concerns** — Frontend, backend, and onboard code are independent
-- **SWaP optimization** — Each layer optimized for its deployment target
-- **Independent deployment** — Each folder can be deployed/tested separately
-- **Clear purpose** — `ground-station` = operator side, `drone-onboard` = drone side
 
 ---
 
