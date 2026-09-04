@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Virtual environments (do NOT commit - recreate with requirements.txt)
+venv/
+venv311/
+.venv/
+
+# Model weights (auto-downloaded by Ultralytics on first run)
+*.pt
+*.onnx
+*.engine
+
+# Detection runtime artifacts
+detections/
+detections.csv
+detections.json
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Dashboard server (Neon DB)
+health-dashboard/server/node_modules/
+health-dashboard/server/.env
