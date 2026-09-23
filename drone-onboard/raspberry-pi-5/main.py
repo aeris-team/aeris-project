@@ -41,7 +41,7 @@ warnings.filterwarnings("ignore")
 
 from config import (
     DEVICE_NAME, DEVICE_VERSION, CPU_MODEL, RAM_SIZE,
-    STATUS, LORA_MODE, CAMERA_NAME,
+    STATUS, LORA_MODE, CAMERA_NAME, GCS_API_URL,
 )
 from human_detection import HumanDetection
 from vital_signs     import VitalSignsEstimator
@@ -57,6 +57,12 @@ from utils           import (
     LORA_RSSI_RANGE, LORA_SNR_RANGE, LORA_FREQUENCY_MHZ,
     DASHBOARD_HOST, DASHBOARD_PORT,
 )
+
+# Shared drone→GCS bridge (works for both pi-4b and pi-5 layouts)
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from gcs_link import GCSLink  # noqa: E402
 
 
 # ── Settings ──────────────────────────────────────────────────────────────
@@ -236,6 +242,11 @@ def main():
     hw_simulator.start()
     print("OK")
 
+    print("[6.7/8] Connecting to Ground Station backend...", end=" ", flush=True)
+    gcs = GCSLink(api_url=GCS_API_URL)
+    gcs_ok = gcs.health()
+    print(f"OK ({GCS_API_URL})" if gcs_ok else f"RETRY ({GCS_API_URL}) — will keep trying")
+
     print("[7/8] Opening USB camera...", end=" ", flush=True)
     cap = open_camera(CAMERA_INDEX)
     if not cap.isOpened():
@@ -272,6 +283,7 @@ def main():
     packet_id       = 0
     last_save_time  = 0.0
     last_tx_time    = 0.0
+    last_gcs_det_time = 0.0
     fps_counter     = RollingFPS(window=20)
 
     # ── Capture thread ─────────────────────────────────────────────────────
@@ -365,6 +377,25 @@ def main():
                 tx_status = "TX OK" if tx_ok else "TX FAIL"
                 dash_state.lora_status = "Connected" if tx_ok else "Error"
 
+                # 5. Drone → GCS backend (telemetry every cycle; detection on person)
+                sim_snap = hw_simulator.snapshot()
+                gcs.send_telemetry(
+                    altitude=packet.get("altitude", 80.0),
+                    speed=float(sim_snap.get("speed", 6.0)),
+                    heading=float(sim_snap.get("heading", packet_id % 360)),
+                    battery=float(sim_snap.get("battery", 85.0)),
+                    lat=float(sim_snap.get("lat", 14.2500)),
+                    lng=float(sim_snap.get("lng", 120.7300)),
+                )
+                if person_detected and (now - last_gcs_det_time) >= LOG_COOLDOWN_SEC:
+                    gcs.send_detection(
+                        confidence=best_conf,
+                        lat=float(sim_snap.get("lat", 14.2515)),
+                        lng=float(sim_snap.get("lng", 120.7310)),
+                        altitude=packet.get("altitude", 90.0),
+                    )
+                    last_gcs_det_time = now
+
                 status_str = (
                     f"DETECTED" if person_detected else "NO TARGET"
                 )
@@ -412,6 +443,10 @@ def main():
         det_thread.join(timeout=1.0)
         lora_receiver.stop()
         lora_sender.close()
+        try:
+            gcs.close()
+        except Exception:
+            pass
         hw_simulator.stop()
         cap.release()
         cv2.destroyAllWindows()

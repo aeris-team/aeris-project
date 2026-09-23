@@ -15,9 +15,16 @@ Target Hardware:
     - LoRa Module (future implementation)
 """
 
+import os
+
 # ── Device Identity ────────────────────────────────────────────────────────
 DEVICE_NAME     = "Raspberry Pi 5"
 DEVICE_VERSION  = "1.0"
+
+# ── Ground Station (FastAPI backend on GCS laptop) ────────────────────────
+# Local test (backend same machine): default localhost
+# Real Pi on same Wi-Fi: GCS_API_URL=http://192.168.1.50:8000
+GCS_API_URL     = os.getenv("GCS_API_URL", "http://localhost:8000")
 
 # ── Simulated Hardware Information ────────────────────────────────────────
 CPU_MODEL       = "Broadcom BCM2712"

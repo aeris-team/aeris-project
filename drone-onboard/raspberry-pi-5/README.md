@@ -138,8 +138,8 @@ sudo reboot
 ssh pi@aeris-pi5.local
 
 # Clone project
-git clone https://github.com/eldrin-dotcom/AERIS.git
-cd AERIS/raspberry-pi-5
+git clone https://github.com/amblessly/aeris-project.git
+cd aeris-project/drone-onboard/raspberry-pi-5
 
 # Create virtual environment
 python3 -m venv venv
@@ -209,6 +209,8 @@ screen -X -S aeris quit
 Edit `config.py`:
 
 ```python
+import os
+
 # Device Configuration
 DEVICE_NAME = "AERIS RPi 5"
 DEVICE_VERSION = "1.0"
@@ -226,9 +228,10 @@ IP_CAMERA_URL = "http://192.168.1.100:8080/video"
 CONFIDENCE_THRESHOLD = 0.5
 YOLO_MODEL = "yolov8n.pt"  # or yolov8s.pt, yolov8m.pt
 
-# Backend Configuration
-BACKEND_WS_URL = "ws://192.168.1.x:8000/ws"  # GCS IP address
-BACKEND_API_URL = "http://192.168.1.x:8000"  # GCS IP address
+# Ground Station backend (drone → FastAPI, via gcs_link.py)
+# Same laptop as dashboard: default localhost ok
+# Real Pi on same Wi-Fi:     GCS_API_URL=http://<laptop-ip>:8000
+GCS_API_URL = os.getenv("GCS_API_URL", "http://localhost:8000")
 ```
 
 ---

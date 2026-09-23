@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { UAVTelemetry, CommLinks, SurvivorDetection, Mission } from '../types';
+import { navigateToTab } from '../lib/navigation';
 
 export interface Settings {
   comm: {
@@ -38,6 +39,8 @@ interface AppState {
   uav: UAVTelemetry;
   survivor: { lat: number; lng: number };
   home: { lat: number; lng: number };
+  hasRealGps: boolean;
+  setRealGpsLocation: (lat: number, lng: number) => void;
 
   link: CommLinks;
 
@@ -49,9 +52,15 @@ interface AppState {
     condition: string;
   };
 
+  videoStatus: 'connecting' | 'live' | 'offline' | 'denied';
+  setVideoStatus: (status: AppState['videoStatus']) => void;
+
   settings: Settings;
   updateSettings: (section: keyof Settings, data: Partial<Settings[keyof Settings]>) => void;
+  setFullSettings: (settings: Settings) => void;
   resetSettings: () => void;
+  reconnectNonce: number;
+  bumpReconnect: () => void;
 
   endMission: () => void;
   startMission: (name: string) => void;
@@ -119,6 +128,22 @@ export const useAppStore = create<AppState>()(
         lat: 14.2485,
         lng: 120.7290,
       },
+      hasRealGps: false,
+      setRealGpsLocation: (lat, lng) =>
+        set((s) => ({
+          hasRealGps: true,
+          home: { lat, lng },
+          ...(s.hasRealGps
+            ? {}
+            : {
+                uav: { ...s.uav, lat, lng },
+                survivor: { lat: lat + 0.0008, lng: lng + 0.0008 },
+              }),
+          settings: {
+            ...s.settings,
+            mission: { ...s.settings.mission, homeLat: lat, homeLng: lng },
+          },
+        })),
 
       link: {
         wifi: { latency: 48, rssi: -62, bitrate: 5.4 },
@@ -150,7 +175,7 @@ export const useAppStore = create<AppState>()(
 
       mission: {
         id: 'mission-001',
-        name: 'Maragondon, Cavite Search',
+        name: 'Local Area Search',
         startedAt: '07:30 AM',
         status: 'active',
       },
@@ -160,7 +185,11 @@ export const useAppStore = create<AppState>()(
         condition: 'Partly Cloudy',
       },
 
+      videoStatus: 'connecting',
+      setVideoStatus: (status) => set({ videoStatus: status }),
+
       settings: defaultSettings,
+      reconnectNonce: 0,
 
       updateSettings: (section, data) =>
         set((s) => ({
@@ -170,7 +199,11 @@ export const useAppStore = create<AppState>()(
           },
         })),
 
+      setFullSettings: (settings) => set({ settings }),
+
       resetSettings: () => set({ settings: defaultSettings }),
+
+      bumpReconnect: () => set((s) => ({ reconnectNonce: s.reconnectNonce + 1 })),
 
       endMission: () => {
         const now = new Date();
@@ -197,7 +230,10 @@ export const useAppStore = create<AppState>()(
         });
       },
 
-      setActiveTab: (tab) => set({ activeTab: tab, sidebarOpen: false }),
+      setActiveTab: (tab) => {
+        set({ activeTab: tab, sidebarOpen: false });
+        navigateToTab(tab);
+      },
       toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
       setSidebarOpen: (open) => set({ sidebarOpen: open }),
       setModalOpen: (open) => set({ modalOpen: open }),

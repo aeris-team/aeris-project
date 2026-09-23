@@ -16,7 +16,7 @@ const mapLayers: Record<MapType, { url: string; attribution: string }> = {
 };
 
 export function MapPage() {
-  const { uav, survivor, home, setModalOpen, alertAcknowledged } = useAppStore();
+  const { uav, survivor, home, setModalOpen, alertAcknowledged, hasRealGps } = useAppStore();
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<L.Map | null>(null);
   const tileLayer = useRef<L.TileLayer | null>(null);
@@ -24,7 +24,20 @@ export function MapPage() {
   const survivorMarker = useRef<L.Marker | null>(null);
   const homeMarker = useRef<L.Marker | null>(null);
   const initialized = useRef(false);
+  const flewToGps = useRef(false);
   const [mapType, setMapType] = useState<MapType>('streets');
+  const [mapOffline, setMapOffline] = useState(() => !navigator.onLine);
+
+  useEffect(() => {
+    const goOnline = () => setMapOffline(false);
+    const goOffline = () => setMapOffline(true);
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    return () => {
+      window.removeEventListener('online', goOnline);
+      window.removeEventListener('offline', goOffline);
+    };
+  }, []);
 
   useEffect(() => {
     if (!mapRef.current || initialized.current) return;
@@ -33,9 +46,13 @@ export function MapPage() {
       zoomControl: false,
     }).setView([uav.lat, uav.lng], 16);
 
-    tileLayer.current = L.tileLayer(mapLayers.streets.url, {
+    const layer = L.tileLayer(mapLayers.streets.url, {
       attribution: mapLayers.streets.attribution,
-    }).addTo(map);
+    });
+    layer.on('tileerror', () => setMapOffline(true));
+    layer.on('tileload', () => setMapOffline(false));
+    layer.addTo(map);
+    tileLayer.current = layer;
 
     const homeIcon = L.divIcon({
       className: 'custom-leaflet-marker bg-transparent border-none',
@@ -75,11 +92,26 @@ export function MapPage() {
   useEffect(() => {
     if (tileLayer.current && mapInstance.current) {
       tileLayer.current.remove();
-      tileLayer.current = L.tileLayer(mapLayers[mapType].url, {
+      const layer = L.tileLayer(mapLayers[mapType].url, {
         attribution: mapLayers[mapType].attribution,
-      }).addTo(mapInstance.current);
+      });
+      layer.on('tileerror', () => setMapOffline(true));
+      layer.on('tileload', () => setMapOffline(false));
+      layer.addTo(mapInstance.current);
+      tileLayer.current = layer;
     }
   }, [mapType]);
+
+  useEffect(() => {
+    if (homeMarker.current) homeMarker.current.setLatLng([home.lat, home.lng]);
+    if (survivorMarker.current) survivorMarker.current.setLatLng([survivor.lat, survivor.lng]);
+  }, [home.lat, home.lng, survivor.lat, survivor.lng]);
+
+  useEffect(() => {
+    if (!hasRealGps || flewToGps.current || !mapInstance.current) return;
+    flewToGps.current = true;
+    mapInstance.current.flyTo([home.lat, home.lng], 16, { duration: 1.2 });
+  }, [hasRealGps, home.lat, home.lng]);
 
   useEffect(() => {
     if (uavMarker.current) {
@@ -146,6 +178,12 @@ export function MapPage() {
         </div>
         <div className="flex-1 w-full h-full relative rounded-xl overflow-hidden min-h-[400px]">
           <div ref={mapRef} className="w-full h-full z-0 absolute inset-0" />
+
+          {mapOffline && (
+            <div className="absolute top-4 right-4 z-10 bg-amber-500 text-white text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded shadow-sm">
+              Offline — markers only
+            </div>
+          )}
 
           <div className="hidden sm:flex absolute bottom-4 right-4 bg-white/90 backdrop-blur-sm p-3 rounded-lg border border-slate-200 shadow-sm text-[10px] text-slate-600 flex-col gap-2 z-10 pointer-events-none">
             <div className="flex items-center gap-2">

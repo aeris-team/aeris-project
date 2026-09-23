@@ -1,56 +1,51 @@
 import { useAppStore } from '../stores/appStore';
+import { LiveVideoPane } from './LiveVideoPane';
 import { Icon } from './Icon';
 
 export function LiveFeed() {
-  const { link, setActiveTab } = useAppStore();
+  const { link, setActiveTab, videoStatus } = useAppStore();
+
+  const badge =
+    videoStatus === 'live'
+      ? { text: 'LIVE', dot: 'bg-green-400 pulse-indicator' }
+      : videoStatus === 'connecting'
+        ? { text: 'CONNECTING', dot: 'bg-yellow-400 pulse-indicator' }
+        : { text: 'OFFLINE', dot: 'bg-red-500' };
+
+  const statusText =
+    videoStatus === 'live'
+      ? '1080p • 30fps'
+      : videoStatus === 'connecting'
+        ? 'Starting camera…'
+        : videoStatus === 'denied'
+          ? 'Camera permission required'
+          : 'Camera unavailable';
 
   return (
     <div className="lg:col-span-4 panel-card p-0 overflow-hidden relative group min-h-[300px] lg:min-h-0">
       <div className="absolute top-4 left-4 right-4 flex justify-between items-start z-10">
         <h2 className="text-sm font-bold text-white drop-shadow-md">LIVE FEED (RGB)</h2>
         <div className="flex items-center gap-2 bg-black/50 backdrop-blur-sm px-2 py-1 rounded text-xs text-white">
-          <span className="w-1.5 h-1.5 rounded-full bg-green-400 pulse-indicator" />
-          <span>LIVE</span>
+          <span className={`w-1.5 h-1.5 rounded-full ${badge.dot}`} />
+          <span>{badge.text}</span>
         </div>
       </div>
 
-      <div className="absolute inset-0 bg-[#0d1b2a]">
-        <img
-          src="https://images.unsplash.com/photo-1623869661448-f62291dc7685?q=80&w=800&auto=format&fit=crop"
-          className="w-full h-full object-cover opacity-60"
-          alt="Aerial Forest View"
-          onError={(e) => {
-            (e.target as HTMLImageElement).style.display = 'none';
-          }}
-        />
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background: `linear-gradient(135deg, #0d1b2a 0%, #1b3a5c 40%, #1b3a5c 60%, #0d1b2a 100%)`,
-          }}
-        />
-        <div
-          className="absolute inset-0 video-overlay pointer-events-none"
-        />
+      <LiveVideoPane crosshairClassName="text-5xl text-white" crosshairOpacity="opacity-60" />
 
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-60 pointer-events-none">
-          <Icon name="crosshair" className="text-5xl text-white" weight="bold" />
-        </div>
-
-        <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end z-10 text-white/90 text-xs">
-          <div>
-            <div className="bg-black/40 backdrop-blur px-2 py-1 rounded inline-block mb-1">1080p • 30fps</div>
-            <div className="bg-black/40 backdrop-blur px-2 py-1 rounded block font-mono">
-              Lat: {Math.round(link.wifi.latency)}ms
-            </div>
+      <div className="absolute bottom-8 left-4 right-4 flex justify-between items-end z-10 text-white/90 text-xs">
+        <div>
+          <div className="bg-black/40 backdrop-blur px-2 py-1 rounded inline-block mb-1">{statusText}</div>
+          <div className="bg-black/40 backdrop-blur px-2 py-1 rounded block font-mono">
+            Lat: {Math.round(link.wifi.latency)}ms
           </div>
-          <button
-            onClick={() => setActiveTab('livefeed')}
-            className="bg-black/40 hover:bg-black/60 backdrop-blur p-2 rounded transition-colors"
-          >
-            <Icon name="corners-out" className="text-lg" />
-          </button>
         </div>
+        <button
+          onClick={() => setActiveTab('livefeed')}
+          className="bg-black/40 hover:bg-black/60 backdrop-blur p-2 rounded transition-colors"
+        >
+          <Icon name="corners-out" className="text-lg" />
+        </button>
       </div>
     </div>
   );

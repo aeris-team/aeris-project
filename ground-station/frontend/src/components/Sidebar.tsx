@@ -1,15 +1,18 @@
+import { Link, useLocation } from 'react-router-dom';
 import { useAppStore } from '../stores/appStore';
 import { Icon, IconFill } from './Icon';
 
 const navItems = [
-  { id: 'dashboard', label: 'Dashboard', icon: 'squares-four' as const },
-  { id: 'livefeed', label: 'Live Feed', icon: 'video-camera' as const, badge: 'LIVE' },
-  { id: 'detections', label: 'Detections', icon: 'crosshair' as const, hasAlert: true },
-  { id: 'map', label: 'Map', icon: 'map-trifold' as const },
+  { path: '/', label: 'Dashboard', icon: 'squares-four' as const },
+  { path: '/livefeed', label: 'Live Feed', icon: 'video-camera' as const, badge: 'LIVE' },
+  { path: '/detections', label: 'Detections', icon: 'crosshair' as const, hasAlert: true },
+  { path: '/map', label: 'Map', icon: 'map-trifold' as const },
 ];
 
 export function Sidebar() {
-  const { activeTab, setActiveTab, uav, alertAcknowledged, sidebarOpen, setSidebarOpen, environment } = useAppStore();
+  const { uav, alertAcknowledged, sidebarOpen, setSidebarOpen, environment, detections } = useAppStore();
+  const location = useLocation();
+  const newDetectionCount = detections.filter((d) => d.status === 'new').length;
 
   const getEnvironmentIcon = (condition: string) => {
     if (condition.includes('Rain')) return 'cloud';
@@ -17,6 +20,9 @@ export function Sidebar() {
     if (condition.includes('Clear') || condition.includes('Sunny')) return 'cloud-sun';
     return 'cloud-sun';
   };
+
+  const isActive = (path: string) =>
+    path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
 
   return (
     <>
@@ -50,11 +56,12 @@ export function Sidebar() {
 
         <nav className="flex-1 overflow-y-auto py-4 px-3 flex flex-col gap-1">
           {navItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id as typeof activeTab)}
+            <Link
+              key={item.path}
+              to={item.path}
+              onClick={() => setSidebarOpen(false)}
               className={`nav-btn w-full flex items-center justify-between px-4 py-2.5 rounded-lg transition-colors ${
-                activeTab === item.id
+                isActive(item.path)
                   ? 'active-nav bg-slate-50 text-slate-900'
                   : 'text-slate-600 hover:bg-slate-50'
               }`}
@@ -68,10 +75,10 @@ export function Sidebar() {
                   {item.badge}
                 </span>
               )}
-              {item.hasAlert && !alertAcknowledged && (
-                <span className="bg-danger text-white text-xs px-2 py-0.5 rounded-full font-bold">1</span>
+              {item.hasAlert && !alertAcknowledged && newDetectionCount > 0 && (
+                <span className="bg-danger text-white text-xs px-2 py-0.5 rounded-full font-bold">{newDetectionCount}</span>
               )}
-            </button>
+            </Link>
           ))}
         </nav>
 

@@ -176,100 +176,163 @@ aeris-project/
 
 ## Quick Start
 
+Flow: **drone (o sim) → FastAPI backend :8000 → dashboard :5173**.
+Walang direct drone↔dashboard connection.
+
 ### Prerequisites
 
-| Software | Version | Download |
-|----------|---------|----------|
+| Software | Version | Install |
+|----------|---------|---------|
+| Python | 3.11+ | `sudo apt install python3 python3-venv python3-pip` |
 | Node.js | 20+ | https://nodejs.org/ |
-| Python | 3.11+ | https://python.org/ |
-| Git | Latest | https://git-scm.com/ |
-| Chrome/Chromium | Latest | https://www.google.com/chrome/ |
+| Git | latest | `sudo apt install git` |
+| Raspberry Pi Imager | for flashing Pi OS | Linux: `sudo apt install rpi-imager` → run `rpi-imager` (or https://www.raspberrypi.com/software/) |
 
-### 1. Clone the Repository
+### 1. Clone
 
 ```bash
 git clone https://github.com/amblessly/aeris-project.git
 cd aeris-project
 ```
 
-### 2. Setup Ground Control Station (Laptop/PC)
+### 2. Install + run backend (FastAPI, port 8000)
 
-#### Install Frontend Dependencies
+```bash
+cd ground-station/backend
+
+# one-time: venv + deps (requests kasama — ginagamit ng sim + gcs_link)
+python3 -m venv venv
+./venv/bin/pip install -r requirements.txt
+
+# run (use --host 0.0.0.0 para ma-reach ng real Pi sa network)
+./venv/bin/python3 -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+# verify
+curl http://localhost:8000/api/mission          # → 200
+curl http://localhost:8000/video/status         # → {"online":false/true,...}
+```
+
+### 3. Install + run frontend (dashboard, port 5173)
 
 ```bash
 cd ground-station/frontend
 npm install
-```
-
-#### Run the Dashboard
-
-```bash
-# Terminal 1 — Start backend (WebSocket server, port 8000)
-cd ground-station/backend
-pip install -r requirements.txt
-python main.py
-
-# Terminal 2 — Start frontend (React dashboard, port 5173)
-cd ground-station/frontend
 npm run dev
 
-# Access dashboard
-# Open: http://localhost:5173
+# open http://localhost:5173  (routes: / /livefeed /detections /map /settings)
 ```
 
-The frontend will automatically connect to `ws://localhost:8000/ws`. If the backend is not running, the dashboard will fall back to simulation mode for testing.
+Pag hindi pa nagco-connect ang drone, auto-fall back ang dashboard sa
+simulation mode. Green bar sa LiveFeed pag may luma online na drone.
 
-### 3. Setup Raspberry Pi 5 (Drone Onboard)
+### 4. Connect a drone
 
-#### Flash Raspberry Pi OS
-
-1. Download Raspberry Pi Imager: https://www.raspberrypi.com/software/
-2. Flash **Raspberry Pi OS (64-bit)** to SD card
-3. Configure Wi-Fi and SSH during flashing
-
-#### Install Detection Software
+#### A. Local fake drone (walang hardware, same laptop)
 
 ```bash
-# SSH into Pi
-ssh pi@raspberrypi.local
+# terminal 3 — kailangan buhay ang backend
+cd ground-station/backend
+./venv/bin/python3 simulate_drone.py
+```
 
-# Update system
+Ito ang gumagawa ng: MJPEG `:5000/video_feed`, POST `/api/telemetry`
+bawat 1s, POST `/api/detection` bawat 8s. Smoke test:
+
+```bash
+curl http://localhost:8000/video/status     # {"online":true,...}
+curl http://localhost:8000/api/drone/status # {"connected":true,...}
+curl http://localhost:8000/api/telemetry    # "source":"drone"
+```
+
+#### B. Real Raspberry Pi 5 (onboard code)
+
+**1 — Flash OS sa SD card** (gamit ang Raspberry Pi Imager):
+
+```bash
+rpi-imager        # o pindutin sa app menu
+```
+
+Sa Imager GUI:
+1. **OS** → Raspberry Pi OS (64-bit) — Lite ok lang (headless)
+2. **Storage** → ang microSD card
+3. **Gear/settings icon** (Next page):
+   - hostname: `aeris-pi5`
+   - Enable SSH (password auth ok)
+   - Configure Wi-Fi → **same SSID/2.4-or-5GHz network ng laptop**
+   - username/password (hal. `pi` / password mo)
+4. **WRITE** → tapos na, isaksak sa Pi 5 at power on.
+
+**2 — Setup sa Pi** (mula sa laptop):
+
+```bash
+ssh pi@aeris-pi5.local
 sudo apt update && sudo apt upgrade -y
+sudo apt install -y python3-venv python3-pip screen git
 
-# Install screen (for background processes)
-sudo apt install -y screen
-
-# Clone project
 git clone https://github.com/amblessly/aeris-project.git
 cd aeris-project/drone-onboard/raspberry-pi-5
-
-# Create virtual environment
 python3 -m venv venv
-source venv/bin/activate
+./venv/bin/pip install -r requirements.txt   # opencv, ultralytics, torch, flask, requests
 
-# Install dependencies (includes YOLOv8, OpenCV, MAVLink, etc.)
-pip install -r requirements.txt
+# test camera (q para mag-close)
+python3 test_cam.py
 ```
 
-#### Run Detection Pipeline
+> Note: unang run ng detection magda-download pa ang ultralytics ng
+> `yolov8n.pt` (~6MB) — kailangan internet sa Pi noong unang beses.
+
+**3 — I-connect sa backend** (nasa same Wi-Fi dapat ang Pi at laptop):
 
 ```bash
-# Start in background using screen
-screen -S aeris
-source venv/bin/activate
-python main.py
+# sa Pi — hanapin ang laptop IP:  ip addr  (laptop) o  hostname -I  (din)
+GCS_API_URL=http://<laptop-ip>:8000 ./venv/bin/python3 main.py
+# o persistent:  export GCS_API_URL=http://<laptop-ip>:8000  sa ~/.bashrc
 
-# Detach: Press Ctrl+A, then D
-# Reconnect later: screen -r aeris
+# background sa Pi:
+screen -S aeris
+GCS_API_URL=http://<laptop-ip>:8000 ./venv/bin/python3 main.py
+# Ctrl+A, detach — bumalik: screen -r aeris
 ```
 
-The onboard pipeline runs:
-- USB Camera capture (RGB + Thermal if attached)
-- YOLOv8 person detection
-- Vital signs estimation
-- JSON packet creation
-- 5GHz Wi-Fi video transmission
-- 915MHz LoRa telemetry link
+Ang `main.py` ay: (a) nagbo-boot ng Flask dashboard sa `:5000` na may
+`/video_feed` MJPEG, (b) nagde-detect ng tao via YOLOv8, (c) nagpo-post
+ng telemetry bawat ~1s at detection kapag may tao papuntang backend.
+
+**4 — Sabihan ang backend kung nasaan ang drone video** (sa laptop,
+bago o habang tumatakbo ang backend):
+
+```bash
+DRONE_VIDEO_URL=http://<pi-ip>:5000/video_feed \
+  ./venv/bin/python3 -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+**5 — Verify:**
+
+```bash
+curl http://localhost:8000/api/drone/status   # connected:true
+curl http://localhost:8000/video/status       # online:true
+# dashboard → /livefeed dapat green ang bar
+```
+
+### 5. Environment variables
+
+| Env var | Default | Direction | Purpose |
+|---------|---------|-----------|---------|
+| `GCS_API_URL` | `http://localhost:8000` | drone → backend | saan mag-post ng telemetry/detection |
+| `DRONE_VIDEO_URL` | `http://127.0.0.1:5000/video_feed` | backend → drone | MJPEG feed na i-proxy sa dashboard |
+| `VIDEO_PORT` | `5000` | sim | port ng fake MJPEG |
+| `TELEMETRY_EVERY_S` / `DETECT_EVERY_S` | `1.0` / `8` | sim | rates ng fake drone |
+
+### 6. Run order (tuwing mag-start from scratch)
+
+```bash
+# T1 — backend
+cd ground-station/backend && ./venv/bin/python3 -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
+# T2 — frontend
+cd ground-station/frontend && npm run dev
+# T3 — drone: sim O real Pi (see step 4)
+cd ground-station/backend && ./venv/bin/python3 simulate_drone.py
+```
 
 ---
 
@@ -286,20 +349,15 @@ IP: 192.168.1.50                 IP: 192.168.1.100
           └──────────────────────────┘
 ```
 
-### WebSocket Configuration
+### Link Configuration
 
-**For local development** (default):
-- Frontend → `ws://localhost:8000/ws`
-- Backend → listens on `0.0.0.0:8000`
-
-**For network deployment:**
-
-Edit `ground-station/frontend/src/App.tsx`:
-
-```typescript
-// Change to your GCS IP address
-useWebSocket('ws://192.168.1.50:8000/ws');
-```
+- **Frontend → backend:** laging `ws://localhost:8000/ws` — pareho
+  itong tumatakbo sa laptop, walang binabago sa `App.tsx`.
+- **Backend:** patakbuing `--host 0.0.0.0 --port 8000` para ma-reach
+  ng Pi sa network (HTTP, hindi WebSocket).
+- **Pi → backend:** `GCS_API_URL=http://<laptop-ip>:8000` (tingnan
+  Quick Start step 4B). Hanapin ang laptop IP sa `ip addr` (Linux) o
+  `ipconfig` (Windows).
 
 ### Test Distances & Altitudes
 
@@ -378,20 +436,21 @@ npm install
 
 ### Backend connection refused
 ```bash
-# Check if port 8000 is in use
-netstat -ano | findstr :8000
+# Check kung busy ang port 8000
+ss -ltnp | grep :8000
 
-# Kill process if needed
-taskkill /PID <PID> /F
+# Kill kung kailangan
+pkill -f "uvicorn main:app"
 ```
 
 ### RPi can't connect to GCS
 ```bash
-# Test network connection
-ping 192.168.1.50
+# Sa Pi — test kung naaabot ang laptop backend (HTTP, hindi WS)
+ping <laptop-ip>
+curl http://<laptop-ip>:8000/api/mission     # dapat 200
 
-# Check WebSocket
-python -c "import websocket; ws = websocket.create_connection('ws://192.168.1.50:8000/ws'); print('OK')"
+# Sa backend logs (laptop)
+grep "POST /api" /tmp/opencode/backend.log | tail
 ```
 
 ### Camera not detected on RPi

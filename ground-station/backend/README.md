@@ -44,9 +44,30 @@ python main.py
 |----------|--------|-------------|
 | `/ws` | WebSocket | Real-time data |
 | `/api/telemetry` | GET | Current UAV telemetry |
+| `/api/telemetry` | POST | Ingest telemetry from drone (0–1 or 0–100 conf normalized) |
+| `/api/drone/status` | GET | Drone connection status (`connected`, `last_seen_age_s`) |
 | `/api/detections` | GET | All detections |
 | `/api/detection` | POST | Add new detection |
 | `/api/mission` | GET | Current mission info |
+| `/video/status` | GET | Proxied drone MJPEG feed status |
+| `/video/stream` | GET | Proxied drone MJPEG stream |
+
+### Drone link / sim
+
+```bash
+# Local fake drone (MJPEG :5000 + telemetry/detection POSTs)
+./venv/bin/python3 simulate_drone.py
+
+# Real Pi (same Wi-Fi as laptop; drone Flask dashboard on :5000)
+GCS_API_URL=http://<laptop-ip>:8000 python main.py
+```
+
+| Env var | Default | Purpose |
+|---------|---------|---------|
+| `GCS_API_URL` | `http://localhost:8000` | drone → backend |
+| `DRONE_VIDEO_URL` | `http://127.0.0.1:5000/video_feed` | backend → drone MJPEG |
+| `VIDEO_PORT` | `5000` | sim MJPEG port |
+| `TELEMETRY_EVERY_S` / `DETECT_EVERY_S` | — | sim rates |
 
 ## WebSocket Messages
 
@@ -92,7 +113,7 @@ python main.py
 ## Testing
 
 ```bash
-# Test WebSocket
+# Test WebSocket (kailangan: ./venv/bin/pip install websocket-client)
 python -c "
 import websocket
 import json

@@ -44,7 +44,13 @@ export function SurvivorModal() {
                   src="https://images.unsplash.com/photo-1542361345-89e58247f2d5?q=80&w=400&auto=format&fit=crop"
                   className="w-full h-full object-cover"
                   alt="RGB High Res"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
                 />
+                <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-xs pointer-events-none">
+                  RGB frame
+                </div>
                 <div className="absolute top-1/4 left-1/4 right-1/4 bottom-1/4 border-2 border-danger opacity-80 rounded pointer-events-none" />
               </div>
             </div>
@@ -58,7 +64,7 @@ export function SurvivorModal() {
                 <div>
                   <div className="text-[10px] text-slate-400 uppercase">GPS Coordinates</div>
                   <div className="font-mono text-sm font-semibold text-slate-800">
-                    {currentDetection?.lat.toFixed(4)}° N, {currentDetection?.lng.toFixed(4)}° E
+                    {Math.abs(currentDetection?.lat ?? 0).toFixed(4)}° {(currentDetection?.lat ?? 0) >= 0 ? 'N' : 'S'}, {Math.abs(currentDetection?.lng ?? 0).toFixed(4)}° {(currentDetection?.lng ?? 0) >= 0 ? 'E' : 'W'}
                   </div>
                   <div className="text-[10px] text-slate-500">± 3 m accuracy</div>
                 </div>
@@ -82,7 +88,10 @@ export function SurvivorModal() {
               </div>
 
               <button
-                onClick={() => setModalOpen(false)}
+                onClick={() => {
+                  setModalOpen(false);
+                  useAppStore.getState().setActiveTab('map');
+                }}
                 className="w-full mt-4 py-2 bg-white border border-aeris text-aeris font-semibold rounded-lg hover:bg-aeris-light transition-colors text-xs flex justify-center items-center gap-2"
               >
                 <Icon name="map-trifold" /> View on Map
@@ -117,6 +126,9 @@ export function SurvivorModal() {
                         src="https://images.unsplash.com/photo-1542361345-89e58247f2d5?q=80&w=40&auto=format&fit=crop"
                         className="w-8 h-8 object-cover rounded inline-block"
                         alt="RGB thumbnail"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
                       />
                     </td>
                     <td className="py-3 px-3">

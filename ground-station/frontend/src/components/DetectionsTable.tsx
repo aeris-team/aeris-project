@@ -9,8 +9,10 @@ export function DetectionsTable() {
       <div className="flex justify-between items-center mb-4 shrink-0">
         <div className="flex items-center gap-3">
           <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Detections Today</h3>
-          {!alertAcknowledged && (
-            <span className="bg-danger text-white text-xs px-2 py-0.5 rounded-full font-bold">1 New</span>
+          {!alertAcknowledged && detections.some((d) => d.status === 'new') && (
+            <span className="bg-danger text-white text-xs px-2 py-0.5 rounded-full font-bold">
+              {detections.filter((d) => d.status === 'new').length} New
+            </span>
           )}
           {alertAcknowledged && (
             <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-bold">All Clear</span>
@@ -53,6 +55,9 @@ export function DetectionsTable() {
                         src="https://images.unsplash.com/photo-1542361345-89e58247f2d5?q=80&w=100&auto=format&fit=crop"
                         className="w-full h-full object-cover"
                         alt="RGB thumbnail"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
                       />
                       {detection.status === 'new' && !alertAcknowledged && (
                         <div className="absolute inset-2 border border-danger" />
@@ -63,6 +68,9 @@ export function DetectionsTable() {
                         src="https://images.unsplash.com/photo-1542361345-89e58247f2d5?q=80&w=100&auto=format&fit=crop"
                         className="w-full h-full object-cover filter contrast-150 hue-rotate-180 saturate-200"
                         alt="Thermal thumbnail"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
                       />
                     </div>
                   </div>
@@ -72,7 +80,7 @@ export function DetectionsTable() {
                   <IconFill name="person" className="inline mr-1" /> Survivor
                 </td>
                 <td className="py-3 px-4 font-mono text-slate-500 hidden md:table-cell">
-                  {detection.lat.toFixed(4)}° N, {detection.lng.toFixed(4)}° E
+                  {Math.abs(detection.lat).toFixed(4)}° {detection.lat >= 0 ? 'N' : 'S'}, {Math.abs(detection.lng).toFixed(4)}° {detection.lng >= 0 ? 'E' : 'W'}
                 </td>
                 <td className="py-3 px-4 hidden sm:table-cell">{detection.distance} m</td>
                 <td className="py-3 px-4 hidden md:table-cell">

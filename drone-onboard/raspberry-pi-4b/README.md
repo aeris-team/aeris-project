@@ -121,8 +121,8 @@ sudo reboot
 ssh pi@aeris-pi.local
 
 # Clone project (or copy files via USB)
-git clone https://github.com/eldrin-dotcom/AERIS.git
-cd AERIS/raspberry-pi-4b  # or raspberry-pi-5
+git clone https://github.com/amblessly/aeris-project.git
+cd aeris-project/drone-onboard/raspberry-pi-4b
 
 # Create virtual environment
 python3 -m venv venv
@@ -192,6 +192,8 @@ screen -X -S aeris quit
 Edit `config.py`:
 
 ```python
+import os
+
 # Device Configuration
 DEVICE_NAME = "AERIS RPi 4B"
 DEVICE_VERSION = "1.0"
@@ -208,9 +210,10 @@ IP_CAMERA_URL = "http://192.168.1.100:8080/video"
 # Detection Settings
 CONFIDENCE_THRESHOLD = 0.5
 
-# Backend Configuration
-BACKEND_WS_URL = "ws://192.168.1.x:8000/ws"  # GCS IP address
-BACKEND_API_URL = "http://192.168.1.x:8000"  # GCS IP address
+# Ground Station backend (drone → FastAPI, via gcs_link.py)
+# Same laptop as dashboard: default localhost ok
+# Real Pi on same Wi-Fi:     GCS_API_URL=http://<laptop-ip>:8000
+GCS_API_URL = os.getenv("GCS_API_URL", "http://localhost:8000")
 ```
 
 ---

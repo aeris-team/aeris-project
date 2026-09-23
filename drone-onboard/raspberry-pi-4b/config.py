@@ -1,6 +1,6 @@
 """
 config.py - Raspberry Pi 4 Model B Device Configuration
-========================================================
+=======================================================
 
 Raspberry Pi-specific values for the AI-powered health monitoring
 prototype. Only hardware/device metadata lives here. Functional
@@ -15,9 +15,14 @@ Target Hardware:
     - LoRa Module (future implementation)
 """
 
+import os
+
 # ── Device Identity ────────────────────────────────────────────────────────
 DEVICE_NAME     = "Raspberry Pi 4 Model B"
 DEVICE_VERSION  = "1.0"
+
+# ── Ground Station (FastAPI backend on GCS laptop) ────────────────────────
+GCS_API_URL     = os.getenv("GCS_API_URL", "http://localhost:8000")
 
 # ── Simulated Hardware Information ────────────────────────────────────────
 CPU_MODEL       = "Broadcom BCM2711"

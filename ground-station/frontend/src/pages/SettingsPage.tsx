@@ -1,13 +1,72 @@
-import { useState, useEffect } from 'react';
-import { useAppStore } from '../stores/appStore';
+import { useState, useEffect, useRef } from 'react';
+import { useAppStore, type Settings } from '../stores/appStore';
 import { Icon } from '../components/Icon';
+import { API_BASE } from '../hooks/useVideoStream';
+
+function cloneSettings(s: Settings): Settings {
+  return JSON.parse(JSON.stringify(s)) as Settings;
+}
+
+function exportDetectionsCsv() {
+  const { detections } = useAppStore.getState();
+  const header = 'ID,Time,Classification,Lat,Lng,Altitude m,Distance m,Confidence %,Status';
+  const rows = detections.map((d) =>
+    [d.id, d.timestamp, 'Survivor', d.lat, d.lng, d.altitude, d.distance, d.confidence, d.status].join(',')
+  );
+  const blob = new Blob([[header, ...rows].join('\n')], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `aeris-detections-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+type DiagRow = { label: string; value: string; ok: boolean | null };
+
+async function fetchDiagnostics(): Promise<DiagRow[]> {
+  const rows: DiagRow[] = [];
+
+  try {
+    const res = await fetch(`${API_BASE}/video/status`, { cache: 'no-store' });
+    const data = await res.json();
+    rows.push({ label: 'Backend API', value: 'Reachable', ok: true });
+    rows.push({
+      label: 'Drone Video',
+      value: data.online ? 'Online' : 'Offline',
+      ok: Boolean(data.online),
+    });
+  } catch {
+    rows.push({ label: 'Backend API', value: 'Unreachable', ok: false });
+    rows.push({ label: 'Drone Video', value: 'Unknown', ok: null });
+  }
+
+  const wsOk = useAppStore.getState().reconnectNonce >= 0;
+  rows.push({ label: 'WebSocket', value: wsOk ? 'Retrying as needed' : 'Idle', ok: null });
+  rows.push({
+    label: 'GPS',
+    value: useAppStore.getState().hasRealGps ? 'Device lock' : 'Simulated',
+    ok: useAppStore.getState().hasRealGps,
+  });
+  rows.push({ label: 'Detections stored', value: String(useAppStore.getState().detections.length), ok: null });
+  rows.push({
+    label: 'Mission',
+    value: useAppStore.getState().mission.status === 'active' ? 'Active' : 'Ended',
+    ok: useAppStore.getState().mission.status === 'active',
+  });
+
+  return rows;
+}
 
 export function SettingsPage() {
   type SectionId = 'comm' | 'mission' | 'alerts' | 'system';
-  const { settings, updateSettings, resetSettings, uav, link } = useAppStore();
+  const { settings, updateSettings, setFullSettings, resetSettings, bumpReconnect, uav, link } = useAppStore();
   const [activeSection, setActiveSection] = useState<SectionId>('comm');
   const [hasChanges, setHasChanges] = useState(false);
   const [saved, setSaved] = useState(false);
+  const baselineRef = useRef<Settings>(cloneSettings(settings));
+  const [diagRows, setDiagRows] = useState<DiagRow[] | null>(null);
+  const [diagLoading, setDiagLoading] = useState(false);
 
   const sections = [
     { id: 'comm' as const, label: 'Comm Links', icon: 'broadcast' as const, hasSettings: true },
@@ -27,13 +86,43 @@ export function SettingsPage() {
   };
 
   const handleSave = () => {
+    baselineRef.current = cloneSettings(useAppStore.getState().settings);
     setSaved(true);
     setHasChanges(false);
   };
 
   const handleDiscard = () => {
+    setFullSettings(cloneSettings(baselineRef.current));
     setHasChanges(false);
     setSaved(false);
+  };
+
+  const handleExport = () => {
+    exportDetectionsCsv();
+    setSaved(false);
+  };
+
+  const handleDiagnostics = async () => {
+    setDiagLoading(true);
+    setDiagRows(null);
+    const rows = await fetchDiagnostics();
+    setDiagRows(rows);
+    setDiagLoading(false);
+  };
+
+  const handleResetConnection = () => {
+    if (confirm('Reset comm connections? WebSocket will reconnect immediately.')) {
+      bumpReconnect();
+    }
+  };
+
+  const handleFactoryReset = () => {
+    if (confirm('Restore ALL settings to factory defaults?')) {
+      resetSettings();
+      baselineRef.current = cloneSettings(useAppStore.getState().settings);
+      setHasChanges(false);
+      setSaved(false);
+    }
   };
 
   const renderCommSettings = () => (
@@ -333,25 +422,50 @@ export function SettingsPage() {
       <div className="border-t border-slate-100 pt-6">
         <h3 className="text-sm font-bold text-slate-800 mb-3">Actions</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <button className="bg-slate-50 hover:bg-slate-100 text-slate-700 text-sm font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
+          <button
+            onClick={handleExport}
+            className="bg-slate-50 hover:bg-slate-100 text-slate-700 text-sm font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+          >
             <Icon name="arrow-right" /> Export Detection Logs
           </button>
-          <button className="bg-slate-50 hover:bg-slate-100 text-slate-700 text-sm font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
-            <Icon name="info" /> View System Diagnostics
+          <button
+            onClick={() => void handleDiagnostics()}
+            disabled={diagLoading}
+            className="bg-slate-50 hover:bg-slate-100 text-slate-700 text-sm font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+          >
+            <Icon name="info" /> {diagLoading ? 'Checking…' : 'View System Diagnostics'}
           </button>
-          <button 
-            onClick={() => { useAppStore.getState().updateUAV({ battery: 78, altitude: 120 }); }}
+          <button
+            onClick={handleResetConnection}
             className="bg-amber-50 hover:bg-amber-100 text-amber-700 text-sm font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
           >
             <Icon name="warning-circle" /> Reset Connection
           </button>
           <button
-            onClick={() => { resetSettings(); handleChange(); }}
+            onClick={handleFactoryReset}
             className="bg-red-50 hover:bg-red-100 text-danger text-sm font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
           >
             <Icon name="warning-circle" /> Factory Reset
           </button>
         </div>
+
+        {diagRows && (
+          <div className="mt-4 bg-slate-50 rounded-lg p-4 text-xs space-y-2">
+            <div className="font-bold text-slate-700 uppercase text-[10px] tracking-wider mb-2">Diagnostics</div>
+            {diagRows.map((row) => (
+              <div key={row.label} className="flex justify-between items-center">
+                <span className="text-slate-500">{row.label}</span>
+                <span
+                  className={`font-mono font-semibold ${
+                    row.ok === true ? 'text-emerald-600' : row.ok === false ? 'text-danger' : 'text-slate-800'
+                  }`}
+                >
+                  {row.value}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

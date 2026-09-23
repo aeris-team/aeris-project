@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { SurvivorModal } from './components/SurvivorModal';
@@ -9,12 +10,32 @@ import { MapPage } from './pages/MapPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { useAppStore } from './stores/appStore';
 import { useWebSocket } from './hooks/useWebSocket';
+import { useGeolocation } from './hooks/useGeolocation';
+import { setNavigator, tabFromPath } from './lib/navigation';
 
 function App() {
-  const { activeTab, modalOpen } = useAppStore();
+  const { modalOpen } = useAppStore();
   const [wsConnected, setWsConnected] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const ws = useWebSocket('ws://localhost:8000/ws');
+  useGeolocation();
+
+  useEffect(() => {
+    setNavigator(navigate);
+  }, [navigate]);
+
+  useEffect(() => {
+    const tab = tabFromPath(location.pathname);
+    const valid = ['dashboard', 'livefeed', 'detections', 'map', 'settings'] as const;
+    if ((valid as readonly string[]).includes(tab) && useAppStore.getState().activeTab !== tab) {
+      useAppStore.setState({
+        activeTab: tab as (typeof valid)[number],
+        sidebarOpen: false,
+      });
+    }
+  }, [location.pathname]);
 
   useEffect(() => {
     if (ws && ws.ws) {
@@ -34,7 +55,7 @@ function App() {
       const state = useAppStore.getState();
       const time = Date.now() / 5000;
       const survivor = state.survivor;
-      
+
       state.updateUAV({
         altitude: Math.max(0, state.uav.altitude + (Math.random() - 0.5) * 0.5),
         speed: Math.max(0, state.uav.speed + (Math.random() - 0.5) * 0.2),
@@ -51,6 +72,24 @@ function App() {
     }, 2000);
 
     return () => clearInterval(telemetryInterval);
+  }, [wsConnected]);
+
+  useEffect(() => {
+    const { hasRealGps } = useAppStore.getState();
+    if (!wsConnected || !hasRealGps) return;
+
+    const positionInterval = setInterval(() => {
+      const state = useAppStore.getState();
+      if (!state.hasRealGps) return;
+      const time = Date.now() / 5000;
+      state.updateUAV({
+        heading: (state.uav.heading + 2) % 360,
+        lat: state.survivor.lat + Math.sin(time) * 0.001,
+        lng: state.survivor.lng + Math.cos(time) * 0.001,
+      });
+    }, 2000);
+
+    return () => clearInterval(positionInterval);
   }, [wsConnected]);
 
   useEffect(() => {
@@ -74,11 +113,14 @@ function App() {
       <main className="flex-1 flex flex-col relative overflow-hidden bg-slate-100">
         <Header />
         <div className="flex-1 overflow-y-auto lg:overflow-hidden p-4 lg:p-6 scroll-smooth">
-          {activeTab === 'dashboard' && <Dashboard />}
-          {activeTab === 'livefeed' && <LiveFeedPage />}
-          {activeTab === 'detections' && <DetectionsPage />}
-          {activeTab === 'map' && <MapPage />}
-          {activeTab === 'settings' && <SettingsPage />}
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/livefeed" element={<LiveFeedPage />} />
+            <Route path="/detections" element={<DetectionsPage />} />
+            <Route path="/map" element={<MapPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
         </div>
       </main>
       <SurvivorModal />

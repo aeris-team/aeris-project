@@ -53,7 +53,7 @@ export function ActiveMission() {
           ) : (
             <button
               onClick={() => {
-                startMission('Maragondon, Cavite Search');
+                startMission('Local Area Search');
               }}
               className="w-full py-2 bg-aeris hover:bg-aeris-dark text-white font-bold rounded shadow-sm transition-colors flex items-center justify-center gap-2"
             >
