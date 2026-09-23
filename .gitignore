@@ -19,3 +19,11 @@ dist/
 # OS
 .DS_Store
 HANDOFF_DRONE_TODO.txt
+
+# Windows installers: push the binaries, skip the notes
+installers-windows/README.md
+
+# Linux installers + Pi deploy package (local only)
+installers-linux/
+pi5-deploy/
+pi5-deploy.zip
